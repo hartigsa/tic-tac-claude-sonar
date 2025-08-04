@@ -7,20 +7,17 @@ RUN addgroup -g 1001 -S nodejs && \
 
 WORKDIR /app
 
-# Copy all files
-COPY --chown=nodejs:nodejs . .
+# Copy all files with secure permissions from the start
+COPY --chown=nodejs:nodejs --chmod=444 . .
 
-# Create server.js and set secure permissions
+# Create server.js with secure permissions and debug
 RUN echo "=== Initial files ===" && \
     ls -la /app/ && \
-    # Copy static-server.js to server.js
+    # Copy static-server.js to server.js with proper permissions
     cp /app/static-server.js /app/server.js && \
-    # Set secure permissions - read-only for static files, executable for server
     chmod 555 /app/server.js && \
-    chmod -R 444 /app/*.html /app/*.js /app/*.json 2>/dev/null || true && \
-    chmod -R 555 /app/css /app/js /app/game 2>/dev/null || true && \
-    # Server needs to be executable
-    chmod 555 /app/server.js && \
+    # Set executable permissions for directories
+    find /app -type d -exec chmod 555 {} \; 2>/dev/null || true && \
     echo "=== Server file created with secure permissions ===" && \
     ls -la /app/server.js
 

@@ -25,19 +25,13 @@ RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
-# Copy built application with correct ownership and read-only permissions
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
-COPY --from=builder --chown=nodejs:nodejs /app/server.js ./
-COPY --from=builder --chown=nodejs:nodejs /app/routes ./routes
-COPY --from=builder --chown=nodejs:nodejs /app/middleware ./middleware
-COPY --from=builder --chown=nodejs:nodejs /app/db ./db
-
-# Set read-only permissions for security
-RUN chmod -R 444 /app/node_modules && \
-    chmod -R 555 /app/routes /app/middleware /app/db && \
-    chmod 444 /app/package*.json && \
-    chmod 555 /app/server.js
+# Copy built application with correct ownership and immediately set secure permissions
+COPY --from=builder --chown=nodejs:nodejs --chmod=444 /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs --chmod=444 /app/package*.json ./
+COPY --from=builder --chown=nodejs:nodejs --chmod=555 /app/server.js ./
+COPY --from=builder --chown=nodejs:nodejs --chmod=555 /app/routes ./routes
+COPY --from=builder --chown=nodejs:nodejs --chmod=555 /app/middleware ./middleware
+COPY --from=builder --chown=nodejs:nodejs --chmod=555 /app/db ./db
 
 # Switch to non-root user
 USER nodejs
