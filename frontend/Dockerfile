@@ -10,13 +10,18 @@ WORKDIR /app
 # Copy all files
 COPY --chown=nodejs:nodejs . .
 
-# Create server.js and debug file structure
+# Create server.js and set secure permissions
 RUN echo "=== Initial files ===" && \
     ls -la /app/ && \
     # Copy static-server.js to server.js
     cp /app/static-server.js /app/server.js && \
-    chmod +x /app/server.js && \
-    echo "=== Server file created ===" && \
+    # Set secure permissions - read-only for static files, executable for server
+    chmod 555 /app/server.js && \
+    chmod -R 444 /app/*.html /app/*.js /app/*.json 2>/dev/null || true && \
+    chmod -R 555 /app/css /app/js /app/game 2>/dev/null || true && \
+    # Server needs to be executable
+    chmod 555 /app/server.js && \
+    echo "=== Server file created with secure permissions ===" && \
     ls -la /app/server.js
 
 # Switch to non-root user
