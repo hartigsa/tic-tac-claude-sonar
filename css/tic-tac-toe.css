@@ -27,13 +27,14 @@ body {
   margin: auto;
 }
 
-table {
+.game-board {
   border-collapse: collapse;
   margin: auto;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #333;
 }
 
-td {
+.game-cell {
   background-color: #4a4a4a;
   border: 5px solid #fff;
   font-size: 80px;
@@ -47,11 +48,30 @@ td {
   perspective: 1000px;
 }
 
-td:hover {
+.game-cell:hover {
   background-color: #5a5a5a;
 }
 
-td.x::before, td.o::before {
+#game-result {
+  display: none;
+  text-align: center;
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #28a745;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: rgba(40, 167, 69, 0.1);
+  border: 2px solid #28a745;
+  border-radius: 8px;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.game-cell.x::before, .game-cell.o::before {
   content: '';
   display: block;
   width: 100%;
@@ -63,11 +83,11 @@ td.x::before, td.o::before {
   background-repeat: no-repeat;
 }
 
-td.x::before {
+.game-cell.x::before {
   background-image: url('path/to/x-image.png'); /* Replace with your 3D X image path */
 }
 
-td.o::before {
+.game-cell.o::before {
   background-image: url('path/to/o-image.png'); /* Replace with your 3D O image path */
 }
 
@@ -83,7 +103,7 @@ td.o::before {
   color: #f0f0f0;
 }
 
-.dark td {
+.dark .game-cell {
   background-color: #666;
   border-color: #444;
 }
@@ -93,7 +113,7 @@ td.o::before {
   color: #333;
 }
 
-.light td {
+.light .game-cell {
   background-color: #ddd;
   border-color: #bbb;
 }

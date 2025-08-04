@@ -17,8 +17,7 @@ let moves;
 
 function init() {
     const board = document.createElement('table');
-    board.setAttribute('border', 1);
-    board.setAttribute('cellspacing', 0);
+    board.className = 'game-board';
 
     let identifier = 1;
     for (let i = 0; i < N_SIZE; i++) {
@@ -26,10 +25,7 @@ function init() {
         board.appendChild(row);
         for (let j = 0; j < N_SIZE; j++) {
             const cell = document.createElement('td');
-            cell.setAttribute('height', 120);
-            cell.setAttribute('width', 120);
-            cell.setAttribute('align', 'center');
-            cell.setAttribute('valign', 'center');
+            cell.className = 'game-cell';
             cell.classList.add('col' + j, 'row' + i);
             if (i === j) {
                 cell.classList.add('diagonal0');
@@ -41,7 +37,7 @@ function init() {
             cell.addEventListener('click', set);
             row.appendChild(cell);
             boxes.push(cell);
-            identifier += identifier;
+            identifier++;
         }
     }
 
@@ -54,7 +50,7 @@ function startNewGame() {
     moves = 0;
     turn = 'X';
     boxes.forEach(square => {
-        square.innerHTML = EMPTY;
+        square.textContent = '';
         square.classList.remove('x', 'o');
     });
     document.getElementById('turn').textContent = 'Player ' + turn;
@@ -79,27 +75,60 @@ function contains(selector, text) {
 }
 
 function set() {
-    if (this.innerHTML !== EMPTY) {
+    if (this.textContent.trim() !== '') {
         return;
     }
-    this.innerHTML = turn;
+    this.textContent = turn;
     this.classList.add(turn.toLowerCase());
     moves += 1;
     score[turn] += this.identifier;
     if (win(this)) {
-        alert('Winner: Player ' + turn);
-        startNewGame();
+        showGameResult('Winner: Player ' + turn);
+        setTimeout(startNewGame, 2000);
     } else if (moves === N_SIZE * N_SIZE) {
-        alert('Draw');
-        startNewGame();
+        showGameResult('Draw');
+        setTimeout(startNewGame, 2000);
     } else {
         turn = turn === 'X' ? 'O' : 'X';
         document.getElementById('turn').textContent = 'Player ' + turn;
     }
 }
 
-init();
+function showGameResult(message) {
+    const resultElement = document.getElementById('game-result');
+    if (resultElement) {
+        resultElement.textContent = message;
+        resultElement.style.display = 'block';
+        setTimeout(() => {
+            resultElement.style.display = 'none';
+        }, 1500);
+    }
+}
 
-document.getElementById('theme-switch').addEventListener('change', function() {
-    document.body.classList.toggle('dark', this.checked);
-});
+function safeInit() {
+    try {
+        const container = document.getElementById('tictactoe');
+        if (!container) {
+            console.error('Game container not found');
+            return;
+        }
+        init();
+    } catch (error) {
+        console.error('Failed to initialize game:', error);
+    }
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', safeInit);
+} else {
+    safeInit();
+}
+
+// Theme toggle with error handling
+const themeSwitch = document.getElementById('theme-switch');
+if (themeSwitch) {
+    themeSwitch.addEventListener('change', function() {
+        document.body.classList.toggle('dark', this.checked);
+    });
+}
