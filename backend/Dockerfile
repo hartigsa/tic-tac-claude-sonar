@@ -1,29 +1,45 @@
-# Build stage - use full Node.js image for building
+# Build stage - use full Node.js image for building native modules
 FROM node:22-alpine AS builder
+
+# Install build dependencies for native modules (bcrypt, etc)
+RUN apk add --no-cache python3 make g++ libc6-compat
 
 WORKDIR /app
 COPY package*.json ./
-# Use npm install and let it create package-lock.json
-RUN npm install --omit=dev && npm cache clean --force
 
-# Production stage - Google Distroless (NO Go, NO shell, NO package manager)
-FROM gcr.io/distroless/nodejs22-debian12:nonroot
+# Install all dependencies including native modules
+RUN npm install --production && npm cache clean --force
 
-# Set working directory
+# Copy application source
+COPY . .
+
+# Production stage - use slim Node.js image compatible with native modules
+FROM node:22-alpine
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Install runtime dependencies only
+RUN apk add --no-cache libc6-compat
+
 WORKDIR /app
 
-# Copy built node_modules from builder with correct ownership
-COPY --from=builder --chown=65532:65532 /app/node_modules ./node_modules
+# Copy built application with correct ownership
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nodejs:nodejs /app/server.js ./
+COPY --from=builder --chown=nodejs:nodejs /app/routes ./routes
+COPY --from=builder --chown=nodejs:nodejs /app/middleware ./middleware
+COPY --from=builder --chown=nodejs:nodejs /app/db ./db
 
-# Copy application files with correct ownership
-COPY --chown=65532:65532 package*.json ./
-COPY --chown=65532:65532 . .
-
-# Explicitly set user (nonroot = UID 65532)
-USER 65532
+# Switch to non-root user
+USER nodejs
 
 EXPOSE 3000
 
-# Distroless doesn't support HEALTHCHECK or ENTRYPOINT with init
-# Direct Node.js execution for maximum security
-CMD ["server.js"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health',(r)=>{if(r.statusCode!==200)throw new Error()})"
+
+CMD ["node", "server.js"]

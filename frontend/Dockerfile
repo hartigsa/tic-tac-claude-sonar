@@ -1,28 +1,31 @@
-# Build stage - use Alpine for smaller attack surface
-FROM node:22-alpine AS builder
+# Use single-stage build for simplicity
+FROM node:22-alpine
 
-WORKDIR /app
-COPY package*.json ./
-RUN npm install && npm cache clean --force
-
-# Build the application (this uses esbuild but we don't ship it)
-COPY . .
-RUN npm run build
-
-# Production stage - Google Distroless for maximum security
-FROM gcr.io/distroless/nodejs22-debian12:nonroot
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
 
 WORKDIR /app
 
-# Copy only built application - NO node_modules, NO esbuild
-COPY --from=builder --chown=65532:65532 /app/dist ./dist
-COPY --chown=65532:65532 ./static-server.js ./server.js
+# Copy all files
+COPY --chown=nodejs:nodejs . .
 
-# Run as nonroot user (UID 65532)
-USER 65532
+# Create server.js and debug file structure
+RUN echo "=== Initial files ===" && \
+    ls -la /app/ && \
+    # Copy static-server.js to server.js
+    cp /app/static-server.js /app/server.js && \
+    chmod +x /app/server.js && \
+    echo "=== Server file created ===" && \
+    ls -la /app/server.js
+
+# Switch to non-root user
+USER nodejs
 
 EXPOSE 5173
 
-# No esbuild, no Go binaries, no system packages - maximum security
-# Serve static files with pure Node.js (no dependencies)
-CMD ["server.js"]
+# Health check for the static server
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:5173',(r)=>{if(r.statusCode!==200)throw new Error()})"
+
+CMD ["node", "server.js"]

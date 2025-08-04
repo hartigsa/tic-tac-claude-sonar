@@ -1,10 +1,36 @@
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const url = require('url');
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import url from 'url';
+import { fileURLToPath } from 'url';
 
-// Define the root directory for static files
-const STATIC_ROOT = path.join(__dirname, 'dist');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Define the root directory for static files - serve from current directory
+const STATIC_ROOT = __dirname;
+
+// Debug: Log the serving directory and its contents
+console.log('Static server starting...');
+console.log('Serving from:', STATIC_ROOT);
+console.log('__dirname:', __dirname);
+
+try {
+  const files = fs.readdirSync(STATIC_ROOT);
+  console.log('Files in STATIC_ROOT:', files);
+  
+  // Check for key files
+  const hasIndex = fs.existsSync(path.join(STATIC_ROOT, 'index.html'));
+  const hasCSS = fs.existsSync(path.join(STATIC_ROOT, 'css'));
+  const hasJS = fs.existsSync(path.join(STATIC_ROOT, 'js'));
+  
+  console.log('Key files check:');
+  console.log('- index.html:', hasIndex);
+  console.log('- css/ directory:', hasCSS);
+  console.log('- js/ directory:', hasJS);
+} catch (err) {
+  console.error('Error reading STATIC_ROOT:', err.message);
+}
 
 // Whitelist of allowed file extensions for security
 const ALLOWED_EXTENSIONS = new Set(['.html', '.js', '.css', '.json', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg']);
@@ -15,6 +41,8 @@ function sanitizeFilePath(requestUrl) {
     const parsedUrl = url.parse(requestUrl);
     let pathname = parsedUrl.pathname || '/';
     
+    console.log('Original pathname:', pathname);
+    
     // Default to index.html for root requests
     if (pathname === '/') {
       pathname = '/index.html';
@@ -23,33 +51,55 @@ function sanitizeFilePath(requestUrl) {
     // Remove query parameters and fragments
     pathname = pathname.split('?')[0].split('#')[0];
     
+    console.log('Processed pathname:', pathname);
+    
     // Normalize the path to prevent directory traversal
     const normalizedPath = path.normalize(pathname);
     
+    console.log('Normalized path:', normalizedPath);
+    
     // Check for directory traversal attempts
-    if (normalizedPath.includes('..') || path.isAbsolute(normalizedPath)) {
+    console.log('Checking for ".." in:', normalizedPath, '-> contains "..":', normalizedPath.includes('..'));
+    if (normalizedPath.includes('..')) {
+      console.log('Directory traversal detected:', normalizedPath);
       return null;
     }
+    console.log('Path passed traversal check');
     
-    // Construct the full file path
-    const fullPath = path.join(STATIC_ROOT, normalizedPath);
+    // Remove leading slash to make it relative
+    const relativePath = normalizedPath.startsWith('/') ? normalizedPath.slice(1) : normalizedPath;
+    console.log('Relative path:', relativePath);
+    
+    // Construct the full file path using relative path
+    const fullPath = path.join(STATIC_ROOT, relativePath);
+    
+    console.log('Full path:', fullPath);
     
     // Ensure the resolved path is still within STATIC_ROOT
     const resolvedPath = path.resolve(fullPath);
     const resolvedRoot = path.resolve(STATIC_ROOT);
     
+    console.log('Resolved path:', resolvedPath);
+    console.log('Resolved root:', resolvedRoot);
+    
     if (!resolvedPath.startsWith(resolvedRoot)) {
+      console.log('Path outside root detected');
       return null;
     }
     
     // Check if file extension is allowed
     const ext = path.extname(resolvedPath).toLowerCase();
+    console.log('File extension:', ext);
+    
     if (!ALLOWED_EXTENSIONS.has(ext)) {
+      console.log('Extension not allowed:', ext);
       return null;
     }
     
+    console.log('Final sanitized path:', resolvedPath);
     return resolvedPath;
   } catch (error) {
+    console.log('Sanitization error:', error.message);
     return null;
   }
 }
@@ -75,7 +125,10 @@ const server = http.createServer((req, res) => {
 
   const filePath = sanitizeFilePath(req.url);
   
+  console.log('Request:', req.url, '-> sanitized path:', filePath);
+  
   if (!filePath) {
+    console.log('Bad request for URL:', req.url);
     res.writeHead(400, { 'Content-Type': 'text/plain' });
     res.end('Bad Request');
     return;

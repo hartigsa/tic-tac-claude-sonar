@@ -6,22 +6,56 @@ class App {
         this.authService = new AuthService();
         this.game = null;
         this.currentUser = null;
-        
-        this.init();
     }
 
     async init() {
         this.setupEventListeners();
         
-        const user = await this.authService.checkAuth();
-        if (user) {
-            this.showGameInterface(user);
-        } else {
+        try {
+            const user = await this.authService.checkAuth();
+            if (user) {
+                this.showGameInterface(user);
+            } else {
+                this.showAuthInterface();
+            }
+        } catch (error) {
+            console.error('Failed to initialize app:', error);
             this.showAuthInterface();
         }
     }
 
+    static async create() {
+        const app = new App();
+        await app.init();
+        return app;
+    }
+
+    showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = message;
+        errorDiv.style.cssText = 'background: #f8d7da; color: #721c24; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #f5c6cb;';
+        
+        const container = document.querySelector('.container') || document.body;
+        container.insertBefore(errorDiv, container.firstChild);
+        
+        setTimeout(() => errorDiv.remove(), 5000);
+    }
+
+    showSuccess(message) {
+        const successDiv = document.createElement('div');
+        successDiv.className = 'success-message';
+        successDiv.textContent = message;
+        successDiv.style.cssText = 'background: #d4edda; color: #155724; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #c3e6cb;';
+        
+        const container = document.querySelector('.container') || document.body;
+        container.insertBefore(successDiv, container.firstChild);
+        
+        setTimeout(() => successDiv.remove(), 3000);
+    }
+
     setupEventListeners() {
+        
         document.getElementById('loginForm').addEventListener('submit', this.handleLogin.bind(this));
         document.getElementById('registerForm').addEventListener('submit', this.handleRegister.bind(this));
         document.getElementById('showRegister').addEventListener('click', this.showRegisterForm.bind(this));
@@ -40,7 +74,7 @@ class App {
             const user = await this.authService.login(username, password);
             this.showGameInterface(user);
         } catch (error) {
-            alert('Login failed: ' + error.message);
+            this.showError('Login failed: ' + error.message);
         }
     }
 
@@ -54,7 +88,7 @@ class App {
             const user = await this.authService.register(username, email, password);
             this.showGameInterface(user);
         } catch (error) {
-            alert('Registration failed: ' + error.message);
+            this.showError('Registration failed: ' + error.message);
         }
     }
 
@@ -67,9 +101,9 @@ class App {
         if (this.game) {
             try {
                 await this.game.saveGame();
-                alert('Game saved successfully!');
+                this.showSuccess('Game saved successfully!');
             } catch (error) {
-                alert('Failed to save game: ' + error.message);
+                this.showError('Failed to save game: ' + error.message);
             }
         }
     }
@@ -79,7 +113,7 @@ class App {
             const history = await this.authService.getGameHistory();
             this.displayGameHistory(history);
         } catch (error) {
-            alert('Failed to load game history: ' + error.message);
+            this.showError('Failed to load game history: ' + error.message);
         }
     }
 
@@ -117,25 +151,52 @@ class App {
     }
 
     displayGameHistory(history) {
-        const historyHtml = history.games.map(game => `
-            <div class="game-history-item">
-                <p>Date: ${new Date(game.created_at).toLocaleString()}</p>
-                <p>Winner: ${game.winner}</p>
-                <p>Moves: ${game.moves}</p>
-            </div>
-        `).join('');
-        
         const modal = document.createElement('div');
         modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <h3>Game History</h3>
-                <div class="history-list">${historyHtml}</div>
-                <button onclick="this.parentElement.parentElement.remove()">Close</button>
-            </div>
-        `;
+        
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+        
+        const title = document.createElement('h3');
+        title.textContent = 'Game History';
+        
+        const historyList = document.createElement('div');
+        historyList.className = 'history-list';
+        
+        history.games.forEach(game => {
+            const gameItem = document.createElement('div');
+            gameItem.className = 'game-history-item';
+            
+            const dateP = document.createElement('p');
+            dateP.textContent = `Date: ${new Date(game.created_at).toLocaleString()}`;
+            
+            const winnerP = document.createElement('p');
+            winnerP.textContent = `Winner: ${game.winner}`;
+            
+            const movesP = document.createElement('p');
+            movesP.textContent = `Moves: ${game.moves}`;
+            
+            gameItem.appendChild(dateP);
+            gameItem.appendChild(winnerP);
+            gameItem.appendChild(movesP);
+            historyList.appendChild(gameItem);
+        });
+        
+        const closeButton = document.createElement('button');
+        closeButton.textContent = 'Close';
+        closeButton.addEventListener('click', () => {
+            modal.remove();
+        });
+        
+        modalContent.appendChild(title);
+        modalContent.appendChild(historyList);
+        modalContent.appendChild(closeButton);
+        modal.appendChild(modalContent);
+        
         document.body.appendChild(modal);
     }
 }
 
-new App();
+App.create().catch(error => {
+    console.error('Failed to create app:', error);
+});
