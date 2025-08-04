@@ -1,0 +1,192 @@
+name: Trivy Security Scan
+
+on:
+  workflow_dispatch:  # Allows manual triggers
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  schedule:
+    - cron: '0 2 * * 1'  # Weekly scan on Mondays at 2 AM
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  scan-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build frontend image
+        run: docker build -t tic-tac-toe-frontend:${{ github.sha }} ./frontend
+        continue-on-error: false
+
+      - name: Run Trivy vulnerability scanner on frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: tic-tac-toe-frontend:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-frontend-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'  # Don't fail the build, just report
+        continue-on-error: true
+
+      - name: Check if SARIF file exists
+        id: check-sarif-frontend
+        run: |
+          if [ -f "trivy-frontend-results.sarif" ]; then
+            echo "sarif-exists=true" >> $GITHUB_OUTPUT
+            echo "Frontend SARIF file exists"
+          else
+            echo "sarif-exists=false" >> $GITHUB_OUTPUT
+            echo "Frontend SARIF file not found"
+          fi
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        if: steps.check-sarif-frontend.outputs.sarif-exists == 'true'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-frontend-results.sarif'
+        continue-on-error: true
+
+      - name: Run Trivy vulnerability scanner (table format)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: tic-tac-toe-frontend:${{ github.sha }}
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+  scan-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t tic-tac-toe-backend:${{ github.sha }} ./backend
+        continue-on-error: false
+
+      - name: Run Trivy vulnerability scanner on backend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: tic-tac-toe-backend:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-backend-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'  # Don't fail the build, just report
+        continue-on-error: true
+
+      - name: Check if SARIF file exists
+        id: check-sarif-backend
+        run: |
+          if [ -f "trivy-backend-results.sarif" ]; then
+            echo "sarif-exists=true" >> $GITHUB_OUTPUT
+            echo "Backend SARIF file exists"
+          else
+            echo "sarif-exists=false" >> $GITHUB_OUTPUT
+            echo "Backend SARIF file not found"
+          fi
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        if: steps.check-sarif-backend.outputs.sarif-exists == 'true'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-backend-results.sarif'
+        continue-on-error: true
+
+      - name: Run Trivy vulnerability scanner (table format)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: tic-tac-toe-backend:${{ github.sha }}
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+  scan-filesystem:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner on filesystem
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+        continue-on-error: true
+
+      - name: Check if filesystem SARIF file exists
+        id: check-sarif-fs
+        run: |
+          if [ -f "trivy-fs-results.sarif" ]; then
+            echo "sarif-exists=true" >> $GITHUB_OUTPUT
+            echo "Filesystem SARIF file exists"
+          else
+            echo "sarif-exists=false" >> $GITHUB_OUTPUT
+            echo "Filesystem SARIF file not found"
+          fi
+
+      - name: Upload filesystem scan results to GitHub Security tab
+        if: steps.check-sarif-fs.outputs.sarif-exists == 'true'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+        continue-on-error: true
+
+      - name: Run Trivy filesystem scan (table format)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          skip-dirs: 'node_modules,.git'
+
+  scan-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy config scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-config-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+        continue-on-error: true
+
+      - name: Check if config SARIF file exists
+        id: check-sarif-config
+        run: |
+          if [ -f "trivy-config-results.sarif" ]; then
+            echo "sarif-exists=true" >> $GITHUB_OUTPUT
+            echo "Config SARIF file exists"
+          else
+            echo "sarif-exists=false" >> $GITHUB_OUTPUT
+            echo "Config SARIF file not found"
+          fi
+
+      - name: Upload config scan results to GitHub Security tab
+        if: steps.check-sarif-config.outputs.sarif-exists == 'true'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-config-results.sarif'
+        continue-on-error: true
+
+      - name: Run Trivy config scan (table format)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          skip-dirs: 'node_modules,.git'

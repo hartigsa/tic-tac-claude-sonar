@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe - Unit Tests</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #4CAF50;
+            text-align: center;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        
+        #test-output {
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            white-space: pre-wrap;
+            font-family: inherit;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        
+        .test-stats {
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196F3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Tic Tac Toe Unit Tests</h1>
+        
+        <div class="test-stats">
+            <h3>Test Information</h3>
+            <p>This test suite validates the core functionality and security of the Tic Tac Toe game including:</p>
+            <ul>
+                <li>Game initialization and state management</li>
+                <li>Move validation and turn switching</li>
+                <li>Win detection algorithms</li>
+                <li>Score tracking and game flow</li>
+                <li>DOM interaction simulation</li>
+                <li><strong>🔒 Security Tests:</strong>
+                    <ul>
+                        <li>XSS prevention and input sanitization</li>
+                        <li>DOM manipulation security</li>
+                        <li>Input validation and bounds checking</li>
+                        <li>Game state integrity protection</li>
+                        <li>Content Security Policy compliance</li>
+                        <li>HTTP security headers validation</li>
+                        <li>Rate limiting and DoS protection</li>
+                        <li>CSRF protection and session security</li>
+                        <li>Secure error handling and data storage</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="controls">
+            <button onclick="runTests()">▶️ Run Tests</button>
+            <button onclick="clearOutput()">🗑️ Clear Output</button>
+            <button onclick="location.reload()">🔄 Refresh</button>
+        </div>
+        
+        <div id="test-output">Click "Run Tests" to execute the test suite...</div>
+    </div>
+
+    <!-- Include the original game logic -->
+    <script>
+        // Copy the original game variables and functions for testing
+        const N_SIZE = 3;
+        const EMPTY = '&nbsp;';
+        let boxes = [];
+        let turn = 'X';
+        let score;
+        let moves;
+
+        function startNewGame() {
+            score = { 'X': 0, 'O': 0 };
+            moves = 0;
+            turn = 'X';
+            boxes.forEach(square => {
+                square.innerHTML = EMPTY;
+                square.classList.remove('x', 'o');
+            });
+            if (document.getElementById('turn')) {
+                document.getElementById('turn').textContent = 'Player ' + turn;
+            }
+        }
+
+        function contains(selector, text) {
+            const elements = document.querySelectorAll(selector);
+            return Array.from(elements).filter(element => RegExp(text).test(element.textContent));
+        }
+
+        function win(clicked) {
+            const memberOf = clicked.className.split(/\s+/);
+            for (const className of memberOf) {
+                const testClass = '.' + className;
+                const items = contains('#tictactoe ' + testClass, turn);
+                if (items.length === N_SIZE) {
+                    items.forEach(item => item.classList.add('win'));
+                    return true;
+                }
+            }
+            return false;
+        }
+    </script>
+
+    <!-- Include test framework -->
+    <script src="test-framework.js"></script>
+    
+    <!-- Include tests -->
+    <script src="tic-tac-toe.test.js"></script>
+    <script src="security.test.js"></script>
+    <script src="security-headers.test.js"></script>
+
+    <script>
+        // Override console methods to display in the test output
+        const testOutput = document.getElementById('test-output');
+        const originalConsole = { ...console };
+        
+        function addToOutput(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const span = document.createElement('span');
+            span.className = type;
+            span.textContent = `[${timestamp}] ${message}\n`;
+            testOutput.appendChild(span);
+            testOutput.scrollTop = testOutput.scrollHeight;
+        }
+        
+        console.log = (message) => {
+            originalConsole.log(message);
+            addToOutput(message, 'info');
+        };
+        
+        console.error = (message) => {
+            originalConsole.error(message);
+            addToOutput(message, 'error');
+        };
+        
+        console.warn = (message) => {
+            originalConsole.warn(message);
+            addToOutput(message, 'warning');
+        };
+
+        function runTests() {
+            testOutput.innerHTML = '';
+            addToOutput('🚀 Starting test execution...', 'info');
+            addToOutput('', 'info');
+            
+            try {
+                // Reset the test framework
+                testFramework.results = { passed: 0, failed: 0, total: 0 };
+                
+                // Import and run the tests
+                setTimeout(() => {
+                    const results = testFramework.runTests();
+                    addToOutput('', 'info');
+                    if (results.failed === 0) {
+                        addToOutput('🎉 All tests completed successfully!', 'success');
+                    } else {
+                        addToOutput(`⚠️ ${results.failed} test(s) failed out of ${results.total}`, 'warning');
+                    }
+                }, 100);
+                
+            } catch (error) {
+                addToOutput(`💥 Test execution failed: ${error.message}`, 'error');
+                originalConsole.error('Test execution error:', error);
+            }
+        }
+
+        function clearOutput() {
+            testOutput.innerHTML = 'Output cleared. Click "Run Tests" to execute the test suite...';
+        }
+
+        // Auto-run tests on page load
+        window.addEventListener('load', () => {
+            setTimeout(runTests, 500);
+        });
+    </script>
+</body>
+</html>

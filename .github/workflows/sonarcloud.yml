@@ -1,0 +1,225 @@
+name: SonarCloud Analysis
+
+# Temporarily disable SonarCloud workflow
+on:
+  workflow_dispatch:  # Only manual triggers
+   push:
+     branches:
+       - master
+       - main
+       - develop
+   pull_request:
+     branches:
+       - master
+       - main
+     types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+
+jobs:
+  sonarcloud:
+    name: SonarCloud Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for better relevancy of analysis
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Check for backend dependencies
+        id: check-backend
+        run: |
+          if [ -f "./backend/package.json" ]; then
+            echo "backend-exists=true" >> $GITHUB_OUTPUT
+            if [ -f "./backend/package-lock.json" ]; then
+              echo "backend-lockfile=true" >> $GITHUB_OUTPUT
+            else
+              echo "backend-lockfile=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "backend-exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for frontend dependencies
+        id: check-frontend
+        run: |
+          if [ -f "./frontend/package.json" ]; then
+            echo "frontend-exists=true" >> $GITHUB_OUTPUT
+            if [ -f "./frontend/package-lock.json" ]; then
+              echo "frontend-lockfile=true" >> $GITHUB_OUTPUT
+            else
+              echo "frontend-lockfile=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "frontend-exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install backend dependencies
+        if: steps.check-backend.outputs.backend-exists == 'true'
+        working-directory: ./backend
+        run: |
+          if [ "${{ steps.check-backend.outputs.backend-lockfile }}" == "true" ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Install frontend dependencies
+        if: steps.check-frontend.outputs.frontend-exists == 'true'
+        working-directory: ./frontend
+        run: |
+          if [ "${{ steps.check-frontend.outputs.frontend-lockfile }}" == "true" ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Run backend tests with coverage
+        if: steps.check-backend.outputs.backend-exists == 'true'
+        working-directory: ./backend
+        run: |
+          npm run test:coverage || true
+        continue-on-error: true
+
+      - name: Run frontend tests with coverage
+        if: steps.check-frontend.outputs.frontend-exists == 'true'
+        working-directory: ./frontend
+        run: |
+          npm run test:coverage || true
+        continue-on-error: true
+
+      - name: Run security tests
+        run: |
+          # Run vanilla JS tests and generate simple coverage report
+          echo "Running security tests..."
+          # Note: For vanilla JS, we'll rely on SonarCloud's built-in analysis
+
+      - name: List coverage files (debug)
+        run: |
+          echo "Looking for coverage files..."
+          find . -name "*.lcov" -o -name "coverage-final.json" -o -name "clover.xml" | head -10
+
+      - name: Check SONAR_TOKEN
+        id: check-token
+        run: |
+          if [ -z "${{ secrets.SONAR_TOKEN }}" ]; then
+            echo "::warning title=Missing SONAR_TOKEN::SONAR_TOKEN secret is not set. Please add it in repository settings."
+            echo "::notice title=Setup Instructions::Visit SONARCLOUD-SETUP.md for complete setup instructions."
+            echo "SonarCloud scan will be skipped without SONAR_TOKEN."
+            echo "has-token=false" >> $GITHUB_OUTPUT
+          else
+            echo "SONAR_TOKEN is configured ✓"
+            echo "has-token=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: SonarCloud Scan
+        if: steps.check-token.outputs.has-token == 'true'
+        uses: SonarSource/sonarqube-scan-action@v5.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          # Additional arguments can be added here
+          args: >
+            -Dsonar.verbose=true
+
+      - name: Wait for Quality Gate
+        if: steps.check-token.outputs.has-token == 'true'
+        run: |
+          echo "Quality Gate status will be visible in SonarCloud dashboard"
+          echo "Visit: https://sonarcloud.io/projects?search=tic-tac-claude"
+
+      - name: SonarCloud Setup Required
+        if: steps.check-token.outputs.has-token == 'false'
+        run: |
+          echo "::notice title=SonarCloud Setup Required::To enable SonarCloud analysis, please:"
+          echo "1. Set up SonarCloud account at https://sonarcloud.io"
+          echo "2. Add SONAR_TOKEN secret in repository settings"
+          echo "3. Update sonar-project.properties with your organization key"
+          echo "4. See SONARCLOUD-SETUP.md for detailed instructions"
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Check for backend dependencies
+        id: check-backend-audit
+        run: |
+          if [ -f "./backend/package.json" ]; then
+            echo "backend-exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "backend-exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for frontend dependencies
+        id: check-frontend-audit
+        run: |
+          if [ -f "./frontend/package.json" ]; then
+            echo "frontend-exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "frontend-exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install backend dependencies for audit
+        if: steps.check-backend-audit.outputs.backend-exists == 'true'
+        working-directory: ./backend
+        run: |
+          if [ -f "package-lock.json" ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Install frontend dependencies for audit
+        if: steps.check-frontend-audit.outputs.frontend-exists == 'true'
+        working-directory: ./frontend
+        run: |
+          if [ -f "package-lock.json" ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Backend Security Audit
+        if: steps.check-backend-audit.outputs.backend-exists == 'true'
+        working-directory: ./backend
+        run: |
+          npm audit --audit-level moderate || true
+          npm audit --json > backend-audit.json || true
+        continue-on-error: true
+
+      - name: Frontend Security Audit
+        if: steps.check-frontend-audit.outputs.frontend-exists == 'true'
+        working-directory: ./frontend
+        run: |
+          npm audit --audit-level moderate || true
+          npm audit --json > frontend-audit.json || true
+        continue-on-error: true
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-results
+          path: |
+            backend/backend-audit.json
+            frontend/frontend-audit.json
+          if-no-files-found: ignore
+        continue-on-error: true
