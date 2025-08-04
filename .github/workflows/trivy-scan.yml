@@ -1,13 +1,13 @@
 name: Trivy Security Scan
 
 on:
-  workflow_dispatch:  # Allows manual triggers
-  push:
-    branches: [ master, main ]
-  pull_request:
-    branches: [ master, main ]
-  schedule:
-    - cron: '0 2 * * 1'  # Weekly scan on Mondays at 2 AM
+  workflow_dispatch:  # Allows manual triggers only
+  # push:
+  #   branches: [ master, main ]
+  # pull_request:
+  #   branches: [ master, main ]
+  # schedule:
+  #   - cron: '0 2 * * 1'  # Weekly scan on Mondays at 2 AM
 
 permissions:
   contents: read
